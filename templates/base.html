@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Examination Hall Allocation{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+      </svg>
+      Examination Hall Allocation Portal
+    </div>
+    <div class="topbar-right">
+      {% if session.get('student_roll') %}
+        <span class="topbar-user">{{ session['student_name'] }}</span>
+        <a href="{{ url_for('student_logout') }}" class="topbar-link">Sign Out</a>
+      {% elif session.get('admin_logged_in') %}
+        <span class="topbar-user">{{ session.get('admin_name', 'Staff') }} &nbsp;({{ session.get('admin_role', 'staff') }})</span>
+        <a href="{{ url_for('admin_logout') }}" class="topbar-link">Sign Out</a>
+      {% else %}
+        <a href="{{ url_for('student_login') }}" class="topbar-link">Student Login</a>
+        <a href="{{ url_for('admin_login') }}" class="topbar-link">Admin</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Sub Nav -->
+  {% block subnav %}
+  <nav class="subnav">
+    <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Home</a>
+    {% if session.get('student_roll') %}
+      <a href="{{ url_for('student_dashboard') }}" {% if 'student' in request.endpoint %}class="active"{% endif %}>My Allocations</a>
+    {% endif %}
+    {% if session.get('admin_logged_in') %}
+      <a href="{{ url_for('admin_dashboard') }}"     {% if request.endpoint == 'admin_dashboard'    %}class="active"{% endif %}>Dashboard</a>
+      <a href="{{ url_for('admin_students') }}"      {% if request.endpoint == 'admin_students'     %}class="active"{% endif %}>Students</a>
+      <a href="{{ url_for('admin_exams') }}"         {% if request.endpoint == 'admin_exams'        %}class="active"{% endif %}>Exams</a>
+      <a href="{{ url_for('admin_allocations') }}"   {% if request.endpoint == 'admin_allocations'  %}class="active"{% endif %}>Allocations</a>
+    {% endif %}
+  </nav>
+  {% endblock %}
+
+  <!-- Flash alerts -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert-bar {{ category }}" role="alert">
+        <span>{{ message }}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    &copy; 2026 Examination Hall Allocation Portal &nbsp;&mdash;&nbsp; All rights reserved.
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

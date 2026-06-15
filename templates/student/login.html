@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Student Login — Examination Portal{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-box-head">
+      <h2>Student Login</h2>
+      <p>Examination Hall Allocation Portal</p>
+    </div>
+    <div class="auth-box-body">
+      <form method="POST" action="{{ url_for('student_login') }}" novalidate>
+
+        <div class="form-group">
+          <label for="identifier">Roll Number or Email Address</label>
+          <input
+            type="text"
+            id="identifier"
+            name="identifier"
+            class="form-control"
+            placeholder="Roll Number or Email Address"
+            required
+            autocomplete="username"
+            autofocus
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="form-control"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+            />
+            <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show/hide password">Show</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.25rem">Login</button>
+      </form>
+
+      <div class="auth-help" style="margin-top:1rem">
+        Enter your college <strong>Roll Number</strong> or your registered <strong>college Email Address</strong> along with your password to access your hall allocation.
+        Contact your administrator if you do not have your login credentials.
+      </div>
+    </div>
+    <div class="auth-box-foot">
+      <a href="{{ url_for('index') }}">&larr; Back to Home</a>
+      <a href="{{ url_for('admin_login') }}">Admin Login</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

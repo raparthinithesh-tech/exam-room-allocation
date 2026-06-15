@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Exams — Admin{% endblock %}
+{% block subnav %}{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-section-label">Main</div>
+    <a href="{{ url_for('admin_dashboard') }}"   class="sidebar-link">Dashboard</a>
+    <a href="{{ url_for('admin_students') }}"    class="sidebar-link">Students</a>
+    <a href="{{ url_for('admin_exams') }}"       class="sidebar-link active">Exams</a>
+    <a href="{{ url_for('admin_allocations') }}" class="sidebar-link">Allocations</a>
+    <a href="{{ url_for('admin_staff') }}"       class="sidebar-link">Staff Access</a>
+    <hr class="sidebar-divider">
+    <a href="{{ url_for('index') }}"             class="sidebar-link">Home Page</a>
+    <a href="{{ url_for('admin_logout') }}"      class="sidebar-link danger-link">Sign Out</a>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-page-title">
+      <span>Exam Schedules</span>
+      <button class="btn btn-primary btn-sm" onclick="openModal('addExamModal')">+ Schedule Exam</button>
+    </div>
+
+    <div class="data-card">
+      <div class="data-card-head">
+        <h3>All Exams ({{ exams|length }})</h3>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Subject</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Duration</th>
+            <th>Branch</th>
+            <th>Sem.</th>
+            <th>Enrolled</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in exams %}
+          <tr>
+            <td>{{ e.Exam_ID }}</td>
+            <td><strong>{{ e.Subject }}</strong></td>
+            <td>{{ e.Date }}</td>
+            <td>{{ e.Time }}</td>
+            <td>{{ e.Duration }}</td>
+            <td>{{ e.Branch or '—' }}</td>
+            <td>{{ e.Semester or '—' }}</td>
+            <td>{{ e.enrolled }}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm"
+                onclick="openEditExam(
+                  {{ e.Exam_ID }},
+                  '{{ e.Subject | replace("'", "\\'") }}',
+                  '{{ e.Date }}',
+                  '{{ e.Time | replace("'", "\\'") }}',
+                  '{{ e.Duration | replace("'", "\\'") }}',
+                  '{{ e.Semester or "" }}',
+                  '{{ e.Branch or "" }}'
+                )">Edit</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="empty-cell">No exams scheduled yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Exam Modal -->
+<div class="modal-overlay" id="addExamModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Schedule New Exam</h3>
+      <button onclick="closeModal('addExamModal')" class="modal-close">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_add_exam') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Subject / Paper Name <span style="color:red">*</span></label>
+          <input type="text" name="subject" class="form-control" placeholder="e.g. Data Structures" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date <span style="color:red">*</span></label>
+            <input type="date" name="date" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Time <span style="color:red">*</span></label>
+            <input type="text" name="time" class="form-control" placeholder="e.g. 09:00 AM" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Duration</label>
+            <input type="text" name="duration" class="form-control" value="3 Hours" />
+          </div>
+          <div class="form-group">
+            <label>Semester</label>
+            <select name="semester" class="form-control">
+              {% for i in range(1,9) %}
+              <option value="{{ i }}">Semester {{ i }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Branch (leave blank for all)</label>
+          <select name="branch" class="form-control">
+            <option value="">All Branches</option>
+            <option>Computer Science</option>
+            <option>Information Technology</option>
+            <option>Electronics</option>
+            <option>Electrical</option>
+            <option>Mechanical</option>
+            <option>Civil</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="closeModal('addExamModal')" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Exam</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Exam Modal -->
+<div class="modal-overlay" id="editExamModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit Exam</h3>
+      <button onclick="closeModal('editExamModal')" class="modal-close">&times;</button>
+    </div>
+    <form method="POST" id="editExamForm" action="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Subject / Paper Name <span style="color:red">*</span></label>
+          <input type="text" name="subject" id="edit_subject" class="form-control" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date <span style="color:red">*</span></label>
+            <input type="date" name="date" id="edit_date" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Time <span style="color:red">*</span></label>
+            <input type="text" name="time" id="edit_time" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Duration</label>
+            <input type="text" name="duration" id="edit_duration" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Semester</label>
+            <select name="semester" id="edit_semester" class="form-control">
+              {% for i in range(1,9) %}
+              <option value="{{ i }}">Semester {{ i }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Branch</label>
+          <select name="branch" id="edit_branch" class="form-control">
+            <option value="">All Branches</option>
+            <option>Computer Science</option>
+            <option>Information Technology</option>
+            <option>Electronics</option>
+            <option>Electrical</option>
+            <option>Mechanical</option>
+            <option>Civil</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="closeModal('editExamModal')" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditExam(id, subject, date, time, duration, semester, branch) {
+  document.getElementById('editExamForm').action = '/admin/exams/edit/' + id;
+  document.getElementById('edit_subject').value  = subject;
+  document.getElementById('edit_date').value     = date;
+  document.getElementById('edit_time').value     = time;
+  document.getElementById('edit_duration').value = duration;
+  // set semester select
+  var semSel = document.getElementById('edit_semester');
+  for (var i = 0; i < semSel.options.length; i++) {
+    semSel.options[i].selected = (semSel.options[i].value == String(semester));
+  }
+  // set branch select
+  var brSel = document.getElementById('edit_branch');
+  for (var i = 0; i < brSel.options.length; i++) {
+    brSel.options[i].selected = (brSel.options[i].value == branch);
+  }
+  openModal('editExamModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Staff Accounts — Admin{% endblock %}
+{% block subnav %}{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-section-label">Main</div>
+    <a href="{{ url_for('admin_dashboard') }}"   class="sidebar-link">Dashboard</a>
+    <a href="{{ url_for('admin_students') }}"    class="sidebar-link">Students</a>
+    <a href="{{ url_for('admin_exams') }}"       class="sidebar-link">Exams</a>
+    <a href="{{ url_for('admin_allocations') }}" class="sidebar-link">Allocations</a>
+    <a href="{{ url_for('admin_staff') }}"       class="sidebar-link active">Staff Access</a>
+    <hr class="sidebar-divider">
+    <a href="{{ url_for('index') }}"             class="sidebar-link">Home Page</a>
+    <a href="{{ url_for('admin_logout') }}"      class="sidebar-link danger-link">Sign Out</a>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-page-title">
+      <span>Staff Access</span>
+      <button class="btn btn-primary btn-sm" onclick="openModal('addStaffModal')">+ Add Staff</button>
+    </div>
+
+    <div class="data-card">
+      <div class="data-card-head">
+        <h3>Authorised Staff ({{ staff_list|length }})</h3>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in staff_list %}
+          <tr>
+            <td><strong>{{ s.Name }}</strong></td>
+            <td>{{ s.Email }}</td>
+            <td>
+              <span class="tag {% if s.Role == 'admin' %}tag-room{% else %}tag-seat{% endif %}">
+                {{ s.Role }}
+              </span>
+            </td>
+            <td>
+              {% if s.Email != session.get('admin_email') %}
+              <form method="POST" action="{{ url_for('admin_delete_staff', staff_id=s.Staff_ID) }}"
+                    onsubmit="return confirm('Remove access for {{ s.Email }}?')">
+                <input type="hidden" name="email" value="{{ s.Email }}" />
+                <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+              </form>
+              {% else %}
+              <span style="font-size:.78rem;color:var(--text-muted)">Current user</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty-cell">No staff accounts found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="auth-help">
+      Only email addresses listed here can log into the staff / admin panel.
+      Add a staff member's email to grant them access.
+    </div>
+  </div>
+</div>
+
+<!-- Add Staff Modal -->
+<div class="modal-overlay" id="addStaffModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Add Staff Access</h3>
+      <button onclick="closeModal('addStaffModal')" class="modal-close">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_add_staff') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Full Name <span style="color:red">*</span></label>
+          <input type="text" name="name" class="form-control" placeholder="Staff member's name" required />
+        </div>
+        <div class="form-group">
+          <label>Email Address <span style="color:red">*</span></label>
+          <input type="email" name="email" class="form-control" placeholder="staff@gmail.com" required />
+        </div>
+        <div class="form-group">
+          <label>Initial Password <span style="color:red">*</span></label>
+          <input type="text" name="password" class="form-control" placeholder="Set a login password" required />
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role" class="form-control">
+            <option value="staff">Staff</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="closeModal('addStaffModal')" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Grant Access</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

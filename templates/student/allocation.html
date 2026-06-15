@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Hall Allocation Slip — {{ detail.Subject }}{% endblock %}
+
+{% block content %}
+<div class="slip-wrap">
+
+  <div class="slip-box">
+    <div class="slip-head">
+      <div class="slip-head-text">
+        <h2>Hall Allocation Slip</h2>
+        <p>Examination Hall Allocation Portal</p>
+      </div>
+      <div class="slip-head-badge">Official Copy</div>
+    </div>
+
+    <table class="slip-table">
+      <tbody>
+        <tr>
+          <td>Student Name</td>
+          <td>{{ detail.Name }}</td>
+        </tr>
+        <tr>
+          <td>Roll Number</td>
+          <td>{{ detail.Roll_No }}</td>
+        </tr>
+        <tr>
+          <td>Branch</td>
+          <td>{{ detail.Branch }}</td>
+        </tr>
+        <tr>
+          <td>Subject</td>
+          <td><strong>{{ detail.Subject }}</strong></td>
+        </tr>
+        <tr>
+          <td>Exam Date</td>
+          <td>{{ detail.Date }}</td>
+        </tr>
+        <tr>
+          <td>Exam Time</td>
+          <td>{{ detail.Time }}</td>
+        </tr>
+        <tr>
+          <td>Duration</td>
+          <td>{{ detail.Duration }}</td>
+        </tr>
+        <tr class="highlight">
+          <td>Block</td>
+          <td>{{ detail.Block or '—' }}</td>
+        </tr>
+        <tr class="highlight">
+          <td>Room Number</td>
+          <td>{{ detail.Room_No }}</td>
+        </tr>
+        <tr class="highlight">
+          <td>Seat Number</td>
+          <td>{{ detail.Seat_No }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="slip-note">
+      Students must carry this slip along with a valid college ID card.
+      Entry to the examination hall will not be permitted 30 minutes after the start time.
+    </div>
+  </div>
+
+  <div class="slip-actions">
+    <a href="{{ url_for('download_slip', exam_id=detail.Exam_ID) }}" class="btn btn-primary btn-lg">Download PDF</a>
+    <button onclick="window.print()" class="btn btn-secondary btn-lg">Print</button>
+    <a href="{{ url_for('student_dashboard') }}" class="btn btn-secondary">&larr; Back</a>
+  </div>
+
+</div>
+{% endblock %}

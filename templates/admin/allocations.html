@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Allocations — Admin{% endblock %}
+{% block subnav %}{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-section-label">Main</div>
+    <a href="{{ url_for('admin_dashboard') }}"   class="sidebar-link">Dashboard</a>
+    <a href="{{ url_for('admin_students') }}"    class="sidebar-link">Students</a>
+    <a href="{{ url_for('admin_exams') }}"       class="sidebar-link">Exams</a>
+    <a href="{{ url_for('admin_allocations') }}" class="sidebar-link active">Allocations</a>
+    <a href="{{ url_for('admin_staff') }}"       class="sidebar-link">Staff Access</a>
+    <hr class="sidebar-divider">
+    <a href="{{ url_for('index') }}"             class="sidebar-link">Home Page</a>
+    <a href="{{ url_for('admin_logout') }}"      class="sidebar-link danger-link">Sign Out</a>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-page-title">
+      <span>Hall Allocations</span>
+      <button class="btn btn-primary btn-sm" onclick="openModal('addAllocModal')">+ New Allocation</button>
+    </div>
+
+    <div class="data-card">
+      <div class="data-card-head">
+        <h3>All Allocations ({{ allocations|length }})</h3>
+        <input type="text" id="searchInput" class="form-control search-input"
+               placeholder="Search roll no, name, room..." oninput="filterTable()" />
+      </div>
+      <table class="data-table" id="allocTable">
+        <thead>
+          <tr>
+            <th>Roll No.</th>
+            <th>Name</th>
+            <th>Subject</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Block</th>
+            <th>Room</th>
+            <th>Seat</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in allocations %}
+          <tr>
+            <td><strong>{{ a.Roll_No }}</strong></td>
+            <td>{{ a.Name }}</td>
+            <td>{{ a.Subject }}</td>
+            <td>{{ a.Date }}</td>
+            <td>{{ a.Time }}</td>
+            <td>{{ a.Block or '—' }}</td>
+            <td><span class="tag tag-room">{{ a.Room_No }}</span></td>
+            <td><span class="tag tag-seat">{{ a.Seat_No }}</span></td>
+            <td>
+              <button class="btn btn-secondary btn-sm"
+                onclick="openEditAlloc(
+                  {{ a.Alloc_ID }},
+                  '{{ a.Block or "" }}',
+                  '{{ a.Room_No }}',
+                  '{{ a.Seat_No }}'
+                )">Edit</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="empty-cell">No allocations recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Allocation Modal -->
+<div class="modal-overlay" id="addAllocModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>New Hall Allocation</h3>
+      <button onclick="closeModal('addAllocModal')" class="modal-close">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_add_allocation') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Student <span style="color:red">*</span></label>
+          <select name="roll_no" class="form-control" required>
+            <option value="">Select student</option>
+            {% for s in students %}
+            <option value="{{ s.Roll_No }}">{{ s.Roll_No }} — {{ s.Name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Exam <span style="color:red">*</span></label>
+          <select name="exam_id" class="form-control" required>
+            <option value="">Select exam</option>
+            {% for e in exams %}
+            <option value="{{ e.Exam_ID }}">{{ e.Subject }} &mdash; {{ e.Date }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Block</label>
+            <input type="text" name="block" class="form-control" placeholder="e.g. Block A" />
+          </div>
+          <div class="form-group">
+            <label>Room Number <span style="color:red">*</span></label>
+            <input type="text" name="room_no" class="form-control" placeholder="e.g. A-101" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Seat Number <span style="color:red">*</span></label>
+          <input type="text" name="seat_no" class="form-control" placeholder="e.g. S-01" required />
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="closeModal('addAllocModal')" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Allocation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Allocation Modal -->
+<div class="modal-overlay" id="editAllocModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit Allocation</h3>
+      <button onclick="closeModal('editAllocModal')" class="modal-close">&times;</button>
+    </div>
+    <form method="POST" id="editAllocForm" action="">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Block</label>
+            <input type="text" name="block" id="ea_block" class="form-control" placeholder="e.g. Block A" />
+          </div>
+          <div class="form-group">
+            <label>Room Number <span style="color:red">*</span></label>
+            <input type="text" name="room_no" id="ea_room" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Seat Number <span style="color:red">*</span></label>
+          <input type="text" name="seat_no" id="ea_seat" class="form-control" required />
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="closeModal('editAllocModal')" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditAlloc(id, block, room, seat) {
+  document.getElementById('editAllocForm').action = '/admin/allocations/edit/' + id;
+  document.getElementById('ea_block').value = block;
+  document.getElementById('ea_room').value  = room;
+  document.getElementById('ea_seat').value  = seat;
+  openModal('editAllocModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Home — Examination Hall Allocation Portal{% endblock %}
+
+{% block content %}
+
+<div class="home-hero">
+  <div class="hero-bg" style="background-image: url('{{ url_for('static', filename='college.webp') }}');"></div>
+  <div class="hero-overlay"></div>
+  <div class="home-hero-inner">
+    <div class="hero-tag">Examination Management System</div>
+    <h1 class="hero-heading">Examination Hall<br>Allocation Portal</h1>
+    <div class="home-hero-btns">
+      <a href="{{ url_for('student_login') }}" class="btn-hero-primary">Student Login</a>
+      <a href="{{ url_for('admin_login') }}"   class="btn-hero-secondary">Staff Login</a>
+    </div>
+  </div>
+</div>
+
+<div class="home-panels">
+  <div class="home-panel">
+    <div class="home-panel-head">For Students</div>
+    <div class="home-panel-body">
+      <p>Log in using your Roll Number or registered email address to instantly view your hall allocation for all upcoming examinations.</p>
+      <ol class="home-steps">
+        <li>Enter your Roll Number or Email and Password</li>
+        <li>View your complete exam schedule</li>
+        <li>Check room number, seat and block on exam day</li>
+        <li>Download or print your Hall Ticket</li>
+      </ol>
+    </div>
+  </div>
+  <div class="home-panel">
+    <div class="home-panel-head">For Admin / Staff</div>
+    <div class="home-panel-body">
+      <p>Administrators can manage student records, schedule examinations, assign rooms and seats, and generate allocation reports.</p>
+      <ol class="home-steps">
+        <li>Add and manage student records</li>
+        <li>Create and schedule exam timetables</li>
+        <li>Allocate rooms and seats per student</li>
+        <li>Update or edit allocations as needed</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<div class="notice-box">
+  <div class="notice">
+    <strong>Note:</strong> Students must carry their Hall Ticket and a valid college ID card to the examination hall. Latecomers will not be permitted after 30 minutes of the exam start time.
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}My Allocations — Examination Portal{% endblock %}
+
+{% block content %}
+
+<!-- Student header bar -->
+<div class="student-header">
+  <div class="student-header-inner">
+    <div class="student-info-block">
+      <div class="student-avatar">{{ student.Name[0].upper() }}</div>
+      <div class="student-meta">
+        <h2>{{ student.Name }}</h2>
+        <p>
+          Roll No: {{ student.Roll_No }}
+          &nbsp;&bull;&nbsp;
+          {{ student.Branch }}
+          {% if student.Semester %}&nbsp;&bull;&nbsp; Semester {{ student.Semester }}{% endif %}
+          {% if student.Subject %}&nbsp;&bull;&nbsp; {{ student.Subject }}{% endif %}
+          {% if student.Email %}&nbsp;&bull;&nbsp; {{ student.Email }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <a href="{{ url_for('student_logout') }}" class="btn btn-secondary btn-sm">Sign Out</a>
+  </div>
+</div>
+
+<div class="page-wrap">
+  <div class="page-title">My Examination Hall Allocations</div>
+
+  {% if allocations %}
+  <div class="alloc-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Duration</th>
+          <th>Block</th>
+          <th>Room No.</th>
+          <th>Seat No.</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alloc in allocations %}
+        <tr>
+          <td><strong>{{ alloc.Subject }}</strong></td>
+          <td>{{ alloc.Date }}</td>
+          <td>{{ alloc.Time }}</td>
+          <td>{{ alloc.Duration }}</td>
+          <td>
+            {% if alloc.Date <= today_date %}
+              {{ alloc.Block or '—' }}
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.78rem">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if alloc.Date <= today_date %}
+              <span class="tag tag-room">{{ alloc.Room_No }}</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.78rem;font-style:italic">Available on exam day</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if alloc.Date <= today_date %}
+              <span class="tag tag-seat">{{ alloc.Seat_No }}</span>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.78rem;font-style:italic">Available on exam day</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if alloc.Date <= today_date %}
+              <a href="{{ url_for('student_allocation', exam_id=alloc.Exam_ID) }}" class="btn btn-secondary btn-sm">View Slip</a>
+              <a href="{{ url_for('download_slip', exam_id=alloc.Exam_ID) }}" class="btn btn-primary btn-sm">Download PDF</a>
+            {% else %}
+              <span style="color:var(--text-muted);font-size:.78rem">Not yet available</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="alloc-table-wrap">
+    <table>
+      <thead><tr><th>Subject</th><th>Date</th><th>Room</th><th>Seat</th></tr></thead>
+      <tbody>
+        <tr class="empty-row"><td colspan="4">No exam allocations found for your account. Please contact your administrator.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
