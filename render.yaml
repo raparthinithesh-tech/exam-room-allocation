@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: exam-hall-allocation
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        value: admin123
+    disk:
+      name: exam-db
+      mountPath: /data
+      sizeGB: 1
