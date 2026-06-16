@@ -30,10 +30,7 @@ def get_db():
         if is_postgres():
             import psycopg2
             db_url = os.environ['DATABASE_URL']
-            # Ensure sslmode is set for Supabase
-            if 'sslmode' not in db_url:
-                db_url += '?sslmode=require'
-            conn = psycopg2.connect(db_url)
+            conn = psycopg2.connect(db_url, sslmode='prefer')
             conn.autocommit = False
             g.db = conn
             g._db_type = 'pg'
@@ -82,9 +79,7 @@ def init_db():
     db_url = os.environ.get('DATABASE_URL')
     if db_url:
         import psycopg2
-        if 'sslmode' not in db_url:
-            db_url += '?sslmode=require'
-        conn = psycopg2.connect(db_url)
+        conn = psycopg2.connect(db_url, sslmode='prefer')
         cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS Student (
