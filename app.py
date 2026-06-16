@@ -1,7 +1,7 @@
 import sqlite3
 import io
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, flash, make_response, g)
 from functools import wraps
@@ -19,15 +19,50 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # ─────────────────────────────────────────────
-# Database helpers
+# Database — supports PostgreSQL + SQLite
 # ─────────────────────────────────────────────
+
+USE_PG = bool(app.config.get('DATABASE_URL'))
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
 
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect(app.config['DATABASE'])
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+        if USE_PG:
+            conn = psycopg2.connect(app.config['DATABASE_URL'])
+            conn.autocommit = False
+            g.db = conn
+        else:
+            conn = sqlite3.connect(app.config['SQLITE_PATH'])
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            g.db = conn
     return g.db
+
+def db_execute(sql, params=()):
+    """Run a query and return a cursor. Translates ? → %s for PostgreSQL."""
+    db = get_db()
+    if USE_PG:
+        sql = sql.replace('?', '%s')
+        # Translate SQLite AUTOINCREMENT syntax
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        cur = db.cursor()
+    cur.execute(sql, params)
+    return cur
+
+def db_fetchone(sql, params=()):
+    cur = db_execute(sql, params)
+    return cur.fetchone()
+
+def db_fetchall(sql, params=()):
+    cur = db_execute(sql, params)
+    return cur.fetchall()
+
+def db_commit():
+    get_db().commit()
 
 @app.teardown_appcontext
 def close_db(error):
@@ -36,79 +71,149 @@ def close_db(error):
         db.close()
 
 def init_db():
-    db = sqlite3.connect(app.config['DATABASE'])
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-
-    db.executescript("""
-        CREATE TABLE IF NOT EXISTS Student (
-            Roll_No  TEXT PRIMARY KEY,
-            Name     TEXT NOT NULL,
-            Password TEXT NOT NULL,
-            Branch   TEXT NOT NULL,
-            Email    TEXT UNIQUE,
-            Phone    TEXT,
-            Semester INTEGER,
-            Subject  TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS Exam (
-            Exam_ID  INTEGER PRIMARY KEY AUTOINCREMENT,
-            Subject  TEXT NOT NULL,
-            Date     TEXT NOT NULL,
-            Time     TEXT NOT NULL,
-            Duration TEXT DEFAULT '3 Hours',
-            Semester INTEGER,
-            Branch   TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS Allocation (
-            Alloc_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            Roll_No  TEXT NOT NULL,
-            Exam_ID  INTEGER NOT NULL,
-            Room_No  TEXT NOT NULL,
-            Seat_No  TEXT NOT NULL,
-            Block    TEXT,
-            FOREIGN KEY (Roll_No) REFERENCES Student(Roll_No) ON DELETE CASCADE,
-            FOREIGN KEY (Exam_ID) REFERENCES Exam(Exam_ID) ON DELETE CASCADE,
-            UNIQUE (Roll_No, Exam_ID)
-        );
-
-        CREATE TABLE IF NOT EXISTS Staff (
-            Staff_ID  INTEGER PRIMARY KEY AUTOINCREMENT,
-            Name      TEXT NOT NULL,
-            Email     TEXT NOT NULL UNIQUE,
-            Password  TEXT NOT NULL,
-            Role      TEXT DEFAULT 'staff'
-        );
-    """)
-
-    # Seed the authorised staff email if not already present
-    existing = db.execute(
-        "SELECT Staff_ID FROM Staff WHERE Email = ?",
-        ('raparthinithesh765@gmail.com',)
-    ).fetchone()
-
-    if not existing:
-        db.execute(
-            "INSERT INTO Staff (Name, Email, Password, Role) VALUES (?, ?, ?, ?)",
-            (
-                'Nithesh',
-                'raparthinithesh765@gmail.com',
-                generate_password_hash('admin123'),   # default password
-                'admin'
+    """Create tables and seed staff account."""
+    if USE_PG:
+        conn = psycopg2.connect(app.config['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS Student (
+                Roll_No  TEXT PRIMARY KEY,
+                Name     TEXT NOT NULL,
+                Password TEXT NOT NULL,
+                Branch   TEXT NOT NULL,
+                Email    TEXT UNIQUE,
+                Phone    TEXT,
+                Semester INTEGER,
+                Subject  TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Exam (
+                Exam_ID  SERIAL PRIMARY KEY,
+                Subject  TEXT NOT NULL,
+                Date     TEXT NOT NULL,
+                Time     TEXT NOT NULL,
+                Duration TEXT DEFAULT '3 Hours',
+                Semester INTEGER,
+                Branch   TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Allocation (
+                Alloc_ID SERIAL PRIMARY KEY,
+                Roll_No  TEXT NOT NULL REFERENCES Student(Roll_No) ON DELETE CASCADE,
+                Exam_ID  INTEGER NOT NULL REFERENCES Exam(Exam_ID) ON DELETE CASCADE,
+                Room_No  TEXT NOT NULL,
+                Seat_No  TEXT NOT NULL,
+                Block    TEXT,
+                UNIQUE (Roll_No, Exam_ID)
+            );
+            CREATE TABLE IF NOT EXISTS Staff (
+                Staff_ID SERIAL PRIMARY KEY,
+                Name     TEXT NOT NULL,
+                Email    TEXT NOT NULL UNIQUE,
+                Password TEXT NOT NULL,
+                Role     TEXT DEFAULT 'staff'
+            );
+        """)
+        cur.execute("SELECT Staff_ID FROM Staff WHERE Email = %s",
+                    ('raparthinithesh765@gmail.com',))
+        if not cur.fetchone():
+            cur.execute(
+                "INSERT INTO Staff (Name, Email, Password, Role) VALUES (%s,%s,%s,%s)",
+                ('Nithesh', 'raparthinithesh765@gmail.com',
+                 generate_password_hash('admin123'), 'admin')
             )
-        )
-        db.commit()
-        print("Staff account created: raparthinithesh765@gmail.com  /  admin123")
-
-    db.commit()
-    db.close()
-    print("Database ready:", app.config['DATABASE'])
+            print("Staff account created: raparthinithesh765@gmail.com  /  admin123")
+        conn.commit()
+        conn.close()
+        print("PostgreSQL database ready.")
+    else:
+        # SQLite path
+        conn = sqlite3.connect(app.config['SQLITE_PATH'])
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS Student (
+                Roll_No  TEXT PRIMARY KEY,
+                Name     TEXT NOT NULL,
+                Password TEXT NOT NULL,
+                Branch   TEXT NOT NULL,
+                Email    TEXT UNIQUE,
+                Phone    TEXT,
+                Semester INTEGER,
+                Subject  TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Exam (
+                Exam_ID  INTEGER PRIMARY KEY AUTOINCREMENT,
+                Subject  TEXT NOT NULL,
+                Date     TEXT NOT NULL,
+                Time     TEXT NOT NULL,
+                Duration TEXT DEFAULT '3 Hours',
+                Semester INTEGER,
+                Branch   TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Allocation (
+                Alloc_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Roll_No  TEXT NOT NULL,
+                Exam_ID  INTEGER NOT NULL,
+                Room_No  TEXT NOT NULL,
+                Seat_No  TEXT NOT NULL,
+                Block    TEXT,
+                FOREIGN KEY (Roll_No) REFERENCES Student(Roll_No) ON DELETE CASCADE,
+                FOREIGN KEY (Exam_ID) REFERENCES Exam(Exam_ID) ON DELETE CASCADE,
+                UNIQUE (Roll_No, Exam_ID)
+            );
+            CREATE TABLE IF NOT EXISTS Staff (
+                Staff_ID  INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name      TEXT NOT NULL,
+                Email     TEXT NOT NULL UNIQUE,
+                Password  TEXT NOT NULL,
+                Role      TEXT DEFAULT 'staff'
+            );
+        """)
+        cur = conn.cursor()
+        cur.execute("SELECT Staff_ID FROM Staff WHERE Email = ?",
+                    ('raparthinithesh765@gmail.com',))
+        if not cur.fetchone():
+            conn.execute(
+                "INSERT INTO Staff (Name, Email, Password, Role) VALUES (?,?,?,?)",
+                ('Nithesh', 'raparthinithesh765@gmail.com',
+                 generate_password_hash('admin123'), 'admin')
+            )
+            print("Staff account created: raparthinithesh765@gmail.com  /  admin123")
+        conn.commit()
+        conn.close()
+        print("SQLite database ready:", app.config['SQLITE_PATH'])
 
 # ─────────────────────────────────────────────
 # Auth decorators
 # ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+# Helper — check if allocation is unlocked
+# Unlocks 1 hour before exam time on exam date
+# ─────────────────────────────────────────────
+
+def is_unlocked(exam_date_str, exam_time_str):
+    """Return True if current time >= exam datetime minus 1 hour."""
+    try:
+        # Try common time formats: "09:00 AM", "09:00", "9:00 AM"
+        for fmt in ('%I:%M %p', '%H:%M', '%I:%M%p'):
+            try:
+                t = datetime.strptime(exam_time_str.strip(), fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            # If time can't be parsed, fall back to date-only check
+            return exam_date_str <= date.today().isoformat()
+
+        exam_dt = datetime.combine(
+            datetime.strptime(exam_date_str, '%Y-%m-%d').date(),
+            t.time()
+        )
+        unlock_dt = exam_dt - timedelta(hours=1)
+        return datetime.now() >= unlock_dt
+    except Exception:
+        # Safe fallback — if anything fails, use date-only
+        return exam_date_str <= date.today().isoformat()
+
 
 def student_required(f):
     @wraps(f)
@@ -156,10 +261,10 @@ def student_login():
         db = get_db()
 
         # Support login via Roll No OR Email
-        student = db.execute(
+        student = db_fetchone(
             "SELECT * FROM Student WHERE Roll_No = ? OR (Email IS NOT NULL AND Email = ?)",
             (identifier.upper(), identifier.lower())
-        ).fetchone()
+        )
 
         if student and check_password_hash(student['Password'], password):
             session['student_roll'] = student['Roll_No']
@@ -176,21 +281,27 @@ def student_login():
 def student_dashboard():
     roll_no = session['student_roll']
     db = get_db()
-    student = db.execute(
+    student = db_fetchone(
         "SELECT * FROM Student WHERE Roll_No = ?", (roll_no,)
-    ).fetchone()
-
-    allocations = db.execute("""
+    )
+    allocations = db_fetchall("""
         SELECT a.*, e.Subject, e.Date, e.Time, e.Duration
         FROM Allocation a
         JOIN Exam e ON a.Exam_ID = e.Exam_ID
         WHERE a.Roll_No = ?
         ORDER BY e.Date ASC
-    """, (roll_no,)).fetchall()
+    """, (roll_no,))
+
+    # Build unlock status per allocation
+    unlock_map = {
+        a['Exam_ID']: is_unlocked(a['Date'], a['Time'])
+        for a in allocations
+    }
 
     return render_template('student/dashboard.html',
                            student=student,
                            allocations=allocations,
+                           unlock_map=unlock_map,
                            today_date=date.today().isoformat())
 
 
@@ -199,21 +310,21 @@ def student_dashboard():
 def student_allocation(exam_id):
     roll_no = session['student_roll']
     db = get_db()
-    detail = db.execute("""
+    detail = db_fetchone("""
         SELECT a.*, e.Subject, e.Date, e.Time, e.Duration,
                s.Name, s.Branch, s.Semester
         FROM Allocation a
         JOIN Exam e ON a.Exam_ID = e.Exam_ID
         JOIN Student s ON a.Roll_No = s.Roll_No
         WHERE a.Roll_No = ? AND a.Exam_ID = ?
-    """, (roll_no, exam_id)).fetchone()
+    """, (roll_no, exam_id))
 
     if not detail:
         flash('Allocation not found.', 'danger')
         return redirect(url_for('student_dashboard'))
 
-    if detail['Date'] > date.today().isoformat():
-        flash('Room allocation details will be available on the exam day.', 'warning')
+    if not is_unlocked(detail['Date'], detail['Time']):
+        flash('Room allocation details will be available 1 hour before the exam.', 'warning')
         return redirect(url_for('student_dashboard'))
 
     return render_template('student/allocation.html', detail=detail)
@@ -224,21 +335,21 @@ def student_allocation(exam_id):
 def download_slip(exam_id):
     roll_no = session['student_roll']
     db = get_db()
-    detail = db.execute("""
+    detail = db_fetchone("""
         SELECT a.*, e.Subject, e.Date, e.Time, e.Duration,
                s.Name, s.Branch, s.Semester
         FROM Allocation a
         JOIN Exam e ON a.Exam_ID = e.Exam_ID
         JOIN Student s ON a.Roll_No = s.Roll_No
         WHERE a.Roll_No = ? AND a.Exam_ID = ?
-    """, (roll_no, exam_id)).fetchone()
+    """, (roll_no, exam_id))
 
     if not detail:
         flash('Allocation not found.', 'danger')
         return redirect(url_for('student_dashboard'))
 
-    if detail['Date'] > date.today().isoformat():
-        flash('Hall ticket will be available for download on the exam day.', 'warning')
+    if not is_unlocked(detail['Date'], detail['Time']):
+        flash('Hall ticket will be available 1 hour before the exam.', 'warning')
         return redirect(url_for('student_dashboard'))
 
     buffer = io.BytesIO()
@@ -323,9 +434,9 @@ def admin_login():
         password = request.form.get('password', '').strip()
 
         db = get_db()
-        staff = db.execute(
+        staff = db_fetchone(
             "SELECT * FROM Staff WHERE Email = ?", (email,)
-        ).fetchone()
+        )
 
         if staff and check_password_hash(staff['Password'], password):
             session['admin_logged_in'] = True
@@ -343,18 +454,18 @@ def admin_login():
 @admin_required
 def admin_dashboard():
     db = get_db()
-    student_count = db.execute("SELECT COUNT(*) FROM Student").fetchone()[0]
-    exam_count    = db.execute("SELECT COUNT(*) FROM Exam").fetchone()[0]
-    alloc_count   = db.execute("SELECT COUNT(*) FROM Allocation").fetchone()[0]
+    student_count = db_fetchone("SELECT COUNT(*) as cnt FROM Student")['cnt']
+    exam_count    = db_fetchone("SELECT COUNT(*) as cnt FROM Exam")['cnt']
+    alloc_count   = db_fetchone("SELECT COUNT(*) as cnt FROM Allocation")['cnt']
 
-    recent_exams = db.execute("""
+    recent_exams = db_fetchall("""
         SELECT e.Subject, e.Date, e.Time, COUNT(a.Roll_No) AS enrolled
         FROM Exam e
         LEFT JOIN Allocation a ON e.Exam_ID = a.Exam_ID
-        GROUP BY e.Exam_ID
+        GROUP BY e.Exam_ID, e.Subject, e.Date, e.Time
         ORDER BY e.Date ASC
         LIMIT 5
-    """).fetchall()
+    """)
 
     return render_template('admin/dashboard.html',
                            student_count=student_count,
@@ -369,7 +480,7 @@ def admin_dashboard():
 @admin_required
 def admin_students():
     db = get_db()
-    students = db.execute("SELECT * FROM Student ORDER BY Roll_No").fetchall()
+    students = db_fetchall("SELECT * FROM Student ORDER BY Roll_No")
     return render_template('admin/students.html', students=students)
 
 
@@ -392,11 +503,11 @@ def admin_add_student():
     try:
         db = get_db()
         hashed = generate_password_hash(password)
-        db.execute("""
+        db_execute("""
             INSERT INTO Student (Roll_No, Name, Password, Branch, Email, Phone, Semester, Subject)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (roll_no, name, hashed, branch, email or None, phone or None, semester, subject or None))
-        db.commit()
+        db_commit()
         flash(f'Student {name} ({roll_no}) added.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -409,8 +520,8 @@ def admin_add_student():
 def admin_delete_student(roll_no):
     try:
         db = get_db()
-        db.execute("DELETE FROM Student WHERE Roll_No = ?", (roll_no,))
-        db.commit()
+        db_execute("DELETE FROM Student WHERE Roll_No = ?", (roll_no,))
+        db_commit()
         flash('Student removed.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -423,13 +534,13 @@ def admin_delete_student(roll_no):
 @admin_required
 def admin_exams():
     db = get_db()
-    exams = db.execute("""
+    exams = db_fetchall("""
         SELECT e.*, COUNT(a.Roll_No) AS enrolled
         FROM Exam e
         LEFT JOIN Allocation a ON e.Exam_ID = a.Exam_ID
-        GROUP BY e.Exam_ID
+        GROUP BY e.Exam_ID, e.Subject, e.Date, e.Time, e.Duration, e.Semester, e.Branch
         ORDER BY e.Date ASC
-    """).fetchall()
+    """)
     return render_template('admin/exams.html', exams=exams)
 
 
@@ -449,11 +560,11 @@ def admin_add_exam():
 
     try:
         db = get_db()
-        db.execute("""
+        db_execute("""
             INSERT INTO Exam (Subject, Date, Time, Duration, Semester, Branch)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (subject, date, time_val, duration, semester, branch))
-        db.commit()
+        db_commit()
         flash(f'Exam "{subject}" scheduled.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -466,8 +577,8 @@ def admin_add_exam():
 def admin_delete_exam(exam_id):
     try:
         db = get_db()
-        db.execute("DELETE FROM Exam WHERE Exam_ID = ?", (exam_id,))
-        db.commit()
+        db_execute("DELETE FROM Exam WHERE Exam_ID = ?", (exam_id,))
+        db_commit()
         flash('Exam deleted.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -490,11 +601,11 @@ def admin_edit_exam(exam_id):
 
     try:
         db = get_db()
-        db.execute("""
+        db_execute("""
             UPDATE Exam SET Subject=?, Date=?, Time=?, Duration=?, Semester=?, Branch=?
             WHERE Exam_ID=?
         """, (subject, date, time_val, duration, semester, branch, exam_id))
-        db.commit()
+        db_commit()
         flash(f'Exam "{subject}" updated.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -507,21 +618,21 @@ def admin_edit_exam(exam_id):
 @admin_required
 def admin_allocations():
     db = get_db()
-    allocations = db.execute("""
+    allocations = db_fetchall("""
         SELECT a.*, s.Name, e.Subject, e.Date, e.Time
         FROM Allocation a
         JOIN Student s ON a.Roll_No = s.Roll_No
         JOIN Exam e ON a.Exam_ID = e.Exam_ID
         ORDER BY e.Date ASC, a.Room_No, a.Seat_No
-    """).fetchall()
+    """)
 
-    students = db.execute(
+    students = db_fetchall(
         "SELECT Roll_No, Name FROM Student ORDER BY Roll_No"
-    ).fetchall()
+    )
 
-    exams = db.execute(
+    exams = db_fetchall(
         "SELECT Exam_ID, Subject, Date FROM Exam ORDER BY Date"
-    ).fetchall()
+    )
 
     return render_template('admin/allocations.html',
                            allocations=allocations,
@@ -543,15 +654,25 @@ def admin_add_allocation():
 
     try:
         db = get_db()
-        db.execute("""
-            INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(Roll_No, Exam_ID)
-            DO UPDATE SET Room_No=excluded.Room_No,
-                          Seat_No=excluded.Seat_No,
-                          Block=excluded.Block
-        """, (roll_no, exam_id, room_no, seat_no, block))
-        db.commit()
+        if USE_PG:
+            db_execute("""
+                INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(Roll_No, Exam_ID)
+                DO UPDATE SET Room_No=EXCLUDED.Room_No,
+                              Seat_No=EXCLUDED.Seat_No,
+                              Block=EXCLUDED.Block
+            """, (roll_no, exam_id, room_no, seat_no, block))
+        else:
+            db_execute("""
+                INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(Roll_No, Exam_ID)
+                DO UPDATE SET Room_No=excluded.Room_No,
+                              Seat_No=excluded.Seat_No,
+                              Block=excluded.Block
+            """, (roll_no, exam_id, room_no, seat_no, block))
+        db_commit()
         flash('Allocation saved.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -564,8 +685,8 @@ def admin_add_allocation():
 def admin_delete_allocation(alloc_id):
     try:
         db = get_db()
-        db.execute("DELETE FROM Allocation WHERE Alloc_ID = ?", (alloc_id,))
-        db.commit()
+        db_execute("DELETE FROM Allocation WHERE Alloc_ID = ?", (alloc_id,))
+        db_commit()
         flash('Allocation removed.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -585,11 +706,11 @@ def admin_edit_allocation(alloc_id):
 
     try:
         db = get_db()
-        db.execute("""
+        db_execute("""
             UPDATE Allocation SET Room_No=?, Seat_No=?, Block=?
             WHERE Alloc_ID=?
         """, (room_no, seat_no, block, alloc_id))
-        db.commit()
+        db_commit()
         flash('Allocation updated.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -602,7 +723,7 @@ def admin_edit_allocation(alloc_id):
 @admin_required
 def admin_staff():
     db = get_db()
-    staff_list = db.execute("SELECT * FROM Staff ORDER BY Name").fetchall()
+    staff_list = db_fetchall("SELECT * FROM Staff ORDER BY Name")
     return render_template('admin/staff.html', staff_list=staff_list)
 
 
@@ -620,11 +741,11 @@ def admin_add_staff():
 
     try:
         db = get_db()
-        db.execute(
+        db_execute(
             "INSERT INTO Staff (Name, Email, Password, Role) VALUES (?, ?, ?, ?)",
             (name, email, generate_password_hash(password), role)
         )
-        db.commit()
+        db_commit()
         flash(f'Staff account created for {email}.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
@@ -641,8 +762,8 @@ def admin_delete_staff(staff_id):
         return redirect(url_for('admin_staff'))
     try:
         db = get_db()
-        db.execute("DELETE FROM Staff WHERE Staff_ID = ?", (staff_id,))
-        db.commit()
+        db_execute("DELETE FROM Staff WHERE Staff_ID = ?", (staff_id,))
+        db_commit()
         flash('Staff account removed.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
