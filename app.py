@@ -29,7 +29,11 @@ def get_db():
     if 'db' not in g:
         if is_postgres():
             import psycopg2
-            conn = psycopg2.connect(os.environ['DATABASE_URL'])
+            db_url = os.environ['DATABASE_URL']
+            # Ensure sslmode is set for Supabase
+            if 'sslmode' not in db_url:
+                db_url += '?sslmode=require'
+            conn = psycopg2.connect(db_url)
             conn.autocommit = False
             g.db = conn
             g._db_type = 'pg'
@@ -78,6 +82,8 @@ def init_db():
     db_url = os.environ.get('DATABASE_URL')
     if db_url:
         import psycopg2
+        if 'sslmode' not in db_url:
+            db_url += '?sslmode=require'
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
         cur.execute("""
