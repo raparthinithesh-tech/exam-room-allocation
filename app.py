@@ -22,31 +22,30 @@ app.config.from_object(Config)
 # Database — supports PostgreSQL + SQLite
 # ─────────────────────────────────────────────
 
-USE_PG = bool(app.config.get('DATABASE_URL'))
-
-if USE_PG:
-    import psycopg2
-    import psycopg2.extras
+def is_postgres():
+    return bool(os.environ.get('DATABASE_URL'))
 
 def get_db():
     if 'db' not in g:
-        if USE_PG:
-            conn = psycopg2.connect(app.config['DATABASE_URL'])
+        if is_postgres():
+            import psycopg2
+            conn = psycopg2.connect(os.environ['DATABASE_URL'])
             conn.autocommit = False
             g.db = conn
+            g._db_type = 'pg'
         else:
             conn = sqlite3.connect(app.config['SQLITE_PATH'])
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON")
             g.db = conn
+            g._db_type = 'sqlite'
     return g.db
 
 def db_execute(sql, params=()):
-    """Run a query and return a cursor. Translates ? → %s for PostgreSQL."""
     db = get_db()
-    if USE_PG:
+    if g._db_type == 'pg':
+        import psycopg2.extras
         sql = sql.replace('?', '%s')
-        # Translate SQLite AUTOINCREMENT syntax
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     else:
         cur = db.cursor()
@@ -54,12 +53,10 @@ def db_execute(sql, params=()):
     return cur
 
 def db_fetchone(sql, params=()):
-    cur = db_execute(sql, params)
-    return cur.fetchone()
+    return db_execute(sql, params).fetchone()
 
 def db_fetchall(sql, params=()):
-    cur = db_execute(sql, params)
-    return cur.fetchall()
+    return db_execute(sql, params).fetchall()
 
 def db_commit():
     get_db().commit()
@@ -68,12 +65,20 @@ def db_commit():
 def close_db(error):
     db = g.pop('db', None)
     if db is not None:
-        db.close()
+        if not is_postgres():
+            db.close()
+        else:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 def init_db():
     """Create tables and seed staff account."""
-    if USE_PG:
-        conn = psycopg2.connect(app.config['DATABASE_URL'])
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        import psycopg2
+        conn = psycopg2.connect(db_url)
         cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS Student (
@@ -654,24 +659,14 @@ def admin_add_allocation():
 
     try:
         db = get_db()
-        if USE_PG:
-            db_execute("""
-                INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(Roll_No, Exam_ID)
-                DO UPDATE SET Room_No=EXCLUDED.Room_No,
-                              Seat_No=EXCLUDED.Seat_No,
-                              Block=EXCLUDED.Block
-            """, (roll_no, exam_id, room_no, seat_no, block))
-        else:
-            db_execute("""
-                INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(Roll_No, Exam_ID)
-                DO UPDATE SET Room_No=excluded.Room_No,
-                              Seat_No=excluded.Seat_No,
-                              Block=excluded.Block
-            """, (roll_no, exam_id, room_no, seat_no, block))
+        db_execute("""
+            INSERT INTO Allocation (Roll_No, Exam_ID, Room_No, Seat_No, Block)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(Roll_No, Exam_ID)
+            DO UPDATE SET Room_No=EXCLUDED.Room_No,
+                          Seat_No=EXCLUDED.Seat_No,
+                          Block=EXCLUDED.Block
+        """, (roll_no, exam_id, room_no, seat_no, block))
         db_commit()
         flash('Allocation saved.', 'success')
     except Exception as e:
@@ -780,7 +775,10 @@ def admin_logout():
 # Entry point
 # ─────────────────────────────────────────────
 
-if __name__ == '__main__':
+# Always init DB — works for both gunicorn (Render) and direct python run
+with app.app_context():
     init_db()
+
+if __name__ == '__main__':
     print("Server running at http://127.0.0.1:5000")
     app.run(debug=True, port=5000, use_reloader=False)
