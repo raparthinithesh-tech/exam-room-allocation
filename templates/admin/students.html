@@ -35,8 +35,6 @@
             <th>Branch</th>
             <th>Subject</th>
             <th>Semester</th>
-            <th>Email</th>
-            <th>Phone</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -48,8 +46,6 @@
             <td>{{ s.Branch }}</td>
             <td>{{ s.Subject or '—' }}</td>
             <td>{{ s.Semester or '—' }}</td>
-            <td>{{ s.Email or '—' }}</td>
-            <td>{{ s.Phone or '—' }}</td>
             <td>
               <form method="POST" action="{{ url_for('admin_delete_student', roll_no=s.Roll_No) }}"
                     onsubmit="return confirm('Remove student {{ s.Name }}? Their allocations will also be deleted.')">
@@ -58,7 +54,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="empty-cell">No students found.</td></tr>
+          <tr><td colspan="6" class="empty-cell">No students found.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -87,10 +83,6 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Password <span style="color:red">*</span></label>
-            <input type="text" name="password" class="form-control" placeholder="Set initial password" required />
-          </div>
-          <div class="form-group">
             <label>Branch <span style="color:red">*</span></label>
             <select name="branch" class="form-control" required>
               <option value="">Select branch</option>
@@ -103,8 +95,6 @@
               <option>Civil</option>
             </select>
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label>Semester</label>
             <select name="semester" class="form-control">
@@ -113,20 +103,10 @@
               {% endfor %}
             </select>
           </div>
-          <div class="form-group">
-            <label>Subject</label>
-            <input type="text" name="subject" class="form-control" placeholder="e.g. Data Structures" />
-          </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" name="email" class="form-control" placeholder="student@college.edu" />
-          </div>
-          <div class="form-group">
-            <label>Phone Number</label>
-            <input type="tel" name="phone" class="form-control" placeholder="10-digit mobile number" />
-          </div>
+        <div class="form-group">
+          <label>Subject</label>
+          <input type="text" name="subject" class="form-control" placeholder="e.g. Data Structures" />
         </div>
       </div>
       <div class="modal-foot">

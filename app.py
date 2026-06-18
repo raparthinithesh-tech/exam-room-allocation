@@ -494,24 +494,20 @@ def admin_students():
 def admin_add_student():
     roll_no  = request.form.get('roll_no', '').strip().upper()
     name     = request.form.get('name', '').strip()
-    password = request.form.get('password', '').strip()
     branch   = request.form.get('branch', '').strip()
-    email    = request.form.get('email', '').strip().lower()
-    phone    = request.form.get('phone', '').strip()
     semester = request.form.get('semester', 1)
     subject  = request.form.get('subject', '').strip()
 
-    if not all([roll_no, name, password, branch]):
-        flash('Roll No, Name, Password and Branch are required.', 'danger')
+    if not all([roll_no, name, branch]):
+        flash('Roll No, Name and Branch are required.', 'danger')
         return redirect(url_for('admin_students'))
 
     try:
         db = get_db()
-        hashed = generate_password_hash(password)
         db_execute("""
             INSERT INTO Student (Roll_No, Name, Password, Branch, Email, Phone, Semester, Subject)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (roll_no, name, hashed, branch, email or None, phone or None, semester, subject or None))
+        """, (roll_no, name, '', branch, None, None, semester, subject or None))
         db_commit()
         flash(f'Student {name} ({roll_no}) added.', 'success')
     except Exception as e:
