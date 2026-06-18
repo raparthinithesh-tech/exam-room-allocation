@@ -258,26 +258,25 @@ def student_login():
 
     if request.method == 'POST':
         identifier = request.form.get('identifier', '').strip()
-        password   = request.form.get('password', '').strip()
 
-        if not identifier or not password:
-            flash('Please enter your Roll Number / Email and Password.', 'danger')
+        if not identifier:
+            flash('Please enter your Roll Number or Email.', 'danger')
             return render_template('student/login.html')
 
         db = get_db()
 
-        # Support login via Roll No OR Email
+        # Support login via Roll No OR Email — no password needed
         student = db_fetchone(
             "SELECT * FROM Student WHERE Roll_No = ? OR (Email IS NOT NULL AND Email = ?)",
             (identifier.upper(), identifier.lower())
         )
 
-        if student and check_password_hash(student['Password'], password):
+        if student:
             session['student_roll'] = student['Roll_No']
             session['student_name'] = student['Name']
             return redirect(url_for('student_dashboard'))
         else:
-            flash('Invalid credentials. Please check your Roll Number / Email and Password.', 'danger')
+            flash('Roll Number / Email not found. Please contact your administrator.', 'danger')
 
     return render_template('student/login.html')
 

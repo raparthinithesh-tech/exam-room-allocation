@@ -18,40 +18,26 @@
             id="identifier"
             name="identifier"
             class="form-control"
-            placeholder="Roll Number or Email Address"
+            placeholder="Enter your Roll Number or Email"
             required
-            autocomplete="username"
+            autocomplete="off"
             autofocus
           />
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <div class="pw-wrap">
-            <input
-              type="password"
-              id="password"
-              name="password"
-              class="form-control"
-              placeholder="Enter your password"
-              required
-              autocomplete="current-password"
-            />
-            <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show/hide password">Show</button>
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.25rem">Login</button>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem">
+          View My Allocation
+        </button>
       </form>
 
       <div class="auth-help" style="margin-top:1rem">
-        Enter your college <strong>Roll Number</strong> or your registered <strong>college Email Address</strong> along with your password to access your hall allocation.
-        Contact your administrator if you do not have your login credentials.
+        Enter your college <strong>Roll Number</strong> or registered <strong>Email Address</strong> to view your examination hall allocation.
+        Contact your administrator if your details are not found.
       </div>
     </div>
     <div class="auth-box-foot">
       <a href="{{ url_for('index') }}">&larr; Back to Home</a>
-      <a href="{{ url_for('admin_login') }}">Admin Login</a>
+      <a href="{{ url_for('admin_login') }}">Staff Login</a>
     </div>
   </div>
 </div>
